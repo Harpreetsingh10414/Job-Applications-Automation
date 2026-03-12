@@ -1,5 +1,5 @@
 from database.db import get_connection
-
+from scrapers.linkedin_scraper import LinkedInScraper
 
 def test_connection():
     try:
@@ -18,6 +18,10 @@ def test_connection():
     except Exception as e:
         print("Database connection failed:", e)
 
+def test_scraper():
+    scraper = LinkedInScraper()
+    scraper.scrape()
+
 
 if __name__ == "__main__":
-    test_connection()
+    test_scraper()
