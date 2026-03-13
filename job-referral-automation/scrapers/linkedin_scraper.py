@@ -1,29 +1,51 @@
+import random
+
 from scrapers.base_scraper import BaseScraper
+from config import LINKEDIN_SEARCH_URLS, JOBS_PER_SEARCH
 
 
 class LinkedInScraper(BaseScraper):
 
     def __init__(self):
         super().__init__()
+        self.visited_jobs = set()
 
+    # --------------------------------
+    # Close LinkedIn Popups
+    # --------------------------------
     def close_popups(self):
 
         selectors = [
+
             "button[aria-label='Dismiss']",
             "button[aria-label='Close']",
-            "button.artdeco-modal__dismiss"
+            "button.artdeco-modal__dismiss",
+            "button[aria-label='Sign in']",
+            "button[data-control-name='dismiss']",
+            "button[aria-label='Reject cookies']"
+
         ]
 
         for selector in selectors:
+
             try:
+
                 btn = self.page.query_selector(selector)
+
                 if btn:
+
                     btn.click()
+
                     print("Popup closed")
-                    self.random_delay()
+
+                    self.random_delay(1, 2)
+
             except:
                 pass
 
+    # --------------------------------
+    # Collect Job Links
+    # --------------------------------
     def collect_job_links(self):
 
         print("Collecting job links...")
@@ -44,65 +66,82 @@ class LinkedInScraper(BaseScraper):
 
                     clean_link = link.split("?")[0]
 
-                    links.add(clean_link)
+                    if clean_link not in self.visited_jobs:
+                        links.add(clean_link)
 
             except:
                 continue
 
-        print("Total job links collected:", len(links))
+        print("Unique job links collected:", len(links))
 
         return list(links)
 
+    # --------------------------------
+    # Scrape Job Page
+    # --------------------------------
     def scrape_job_page(self, url):
 
         print("Opening job:", url)
 
         try:
 
-            self.page.goto(url)
-
-            self.random_delay()
+            if not self.safe_goto(url):
+                return None
 
             self.close_popups()
 
-            # expand description
+            self.random_page_interaction()
+
+            # Expand description
             try:
+
                 show_more = self.page.query_selector(
                     "button.show-more-less-html__button"
                 )
+
                 if show_more:
                     show_more.click()
-                    self.random_delay()
+                    self.random_delay(1, 2)
+
             except:
                 pass
 
-            # title
+            # ----------------
+            # Title
+            # ----------------
             title_el = self.page.query_selector("h1")
-
             title = title_el.inner_text().strip() if title_el else "N/A"
 
-            # company
+            # ----------------
+            # Company
+            # ----------------
             company_el = self.page.query_selector(
                 "a.topcard__org-name-link, span.topcard__flavor"
             )
 
             company = company_el.inner_text().strip() if company_el else "N/A"
 
-            # location
+            # ----------------
+            # Location
+            # ----------------
             location_el = self.page.query_selector(
                 "span.topcard__flavor--bullet"
             )
 
             location = location_el.inner_text().strip() if location_el else "N/A"
 
-            # posted time
+            # ----------------
+            # Posted Time
+            # ----------------
             posted_el = self.page.query_selector(
                 "span.posted-time-ago__text"
             )
 
             posted_time = posted_el.inner_text().strip() if posted_el else "N/A"
 
-            # seniority
+            # ----------------
+            # Seniority
+            # ----------------
             seniority = "N/A"
 
             criteria = self.page.query_selector_all(
@@ -125,7 +164,9 @@ class LinkedInScraper(BaseScraper):
 
                         seniority = value.inner_text().strip()
 
-            # description
+            # ----------------
+            # Description
+            # ----------------
             desc_el = self.page.query_selector(
                 "div.show-more-less-html__markup"
             )
@@ -133,6 +174,9 @@ class LinkedInScraper(BaseScraper):
             description = desc_el.inner_text().strip() if desc_el else "N/A"
 
             job_data = {
+
+                "platform": "LinkedIn",
+
                 "title": title,
                 "company": company,
                 "location": location,
@@ -140,15 +184,10 @@ class LinkedInScraper(BaseScraper):
                 "seniority_level": seniority,
                 "job_link": url,
                 "description": description
+
             }
 
-            print("-----")
-            print("Title:", title)
-            print("Company:", company)
-            print("Location:", location)
-            print("Posted:", posted_time)
-            print("Seniority:", seniority)
-            print("Description Length:", len(description))
+            self.visited_jobs.add(url)
 
             return job_data
 
@@ -158,6 +197,9 @@ class LinkedInScraper(BaseScraper):
 
             return None
 
+    # --------------------------------
+    # Main Scraper
+    # --------------------------------
     def scrape(self):
 
         print("Starting LinkedIn scraper")
@@ -168,27 +210,53 @@ class LinkedInScraper(BaseScraper):
 
         try:
 
-            url = "https://www.linkedin.com/jobs/search?keywords=Software%20%2B%20Java%20%2B%20Backend&location=India&geoId=102713980&f_JT=F&f_E=2%2C3%2C4&f_TPR=r86400&f_PP=104869687%2C106442238%2C105214831%2C105556991%2C103671728%2C106164952&position=1&pageNum=0"
+            for search in LINKEDIN_SEARCH_URLS:
 
-            self.page.goto(url)
+                location = search["location"]
+                level = search["level"]
+                url = search["url"]
 
-            self.random_delay()
+                print("\n================================")
+                print("Scanning Location:", location)
+                print("Experience Level:", level)
+                print("================================\n")
 
-            print("Page loaded")
+                if not self.safe_goto(url):
+                    continue
 
-            self.scroll_page(8)
+                # Close popups immediately
+                self.close_popups()
 
-            job_links = self.collect_job_links()
+                # Simulate human behaviour
+                self.random_page_interaction()
 
-            for link in job_links[:5]:
+                # Scroll to load jobs
+                self.scroll_page(10)
 
-                job_data = self.scrape_job_page(link)
+                # Close popups again
+                self.close_popups()
 
-                if job_data:
-                    jobs_data.append(job_data)
+                job_links = self.collect_job_links()
 
-                # human delay (important)
-                self.random_delay()
+                job_links = job_links[:JOBS_PER_SEARCH]
+
+                print("Jobs to scrape:", len(job_links))
+
+                for link in job_links:
+
+                    if link in self.visited_jobs:
+                        continue
+
+                    job_data = self.scrape_job_page(link)
+
+                    if job_data:
+
+                        job_data["search_location"] = location
+                        job_data["search_level"] = level
+
+                        jobs_data.append(job_data)
+
+                    self.random_delay(3, 7)
 
         except Exception as e:
 
@@ -197,5 +265,8 @@ class LinkedInScraper(BaseScraper):
         finally:
 
             self.close_browser()
+
+        # Save results to Excel
+        self.save_jobs_to_excel(jobs_data)
 
         return jobs_data
