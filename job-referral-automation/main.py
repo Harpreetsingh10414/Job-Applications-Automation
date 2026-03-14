@@ -13,13 +13,15 @@ def run():
 
     scraper = LinkedInScraper()
 
-    jobs = scraper.scrape()
+    jobs, execution_time = scraper.scrape()
 
     if not jobs:
         print("No jobs scraped. Email will not be sent.")
         return
 
     metadata = generate_job_metadata(jobs)
+
+    metadata["execution_time"] = execution_time
 
     send_email_report(
         metadata,

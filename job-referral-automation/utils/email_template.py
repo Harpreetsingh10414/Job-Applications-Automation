@@ -19,6 +19,8 @@ SUMMARY
 Total Jobs Found: {metadata['total_jobs']}
 Unique Companies: {metadata['unique_companies']}
 
+Execution Time: {metadata['execution_time']}
+
 ----------------------------------------
 Jobs by Location
 ----------------------------------------
